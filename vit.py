@@ -96,7 +96,7 @@ class DinoViT(nn.Module):
             register_token = self.param(
                 "register_tokens",
                 nn.initializers.zeros,
-                (1, self.num_register_token, self.embed_dim),
+                (1, self.num_register_tokens, self.embed_dim),
             )
             register_token = jnp.broadcast_to(register_token, (x.shape[0], *register_token.shape[1:]))
             x = jnp.concatenate(
@@ -125,7 +125,7 @@ class DinoViT(nn.Module):
             return {
                 "x_norm_clstoken": x_norm[:, 0],
                 "x_norm_regtokens": x_norm[:, 1 : self.num_register_tokens + 1],
-                "x_norm_patchtokens": x_norm[:, self.num_register_token + 1 :],
+                "x_norm_patchtokens": x_norm[:, self.num_register_tokens + 1 :],
                 "x_prenorm": x,
             }
         else:

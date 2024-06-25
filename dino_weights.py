@@ -56,7 +56,7 @@ def load_dino_vits(img_size=518):
         mlp_ratio=mlp_ratio,
         depth=12,
         img_size=img_size,
-        register_token=True,
+        register_tokens=True,
     )
     vit_def = vit_cls()
     vit_params = vit_def.init(jax.random.PRNGKey(0), jnp.ones((1, img_size, img_size, 3)))[
