@@ -15,6 +15,7 @@ def load_vit_params(params_jax: dict, vit_pt: torch.nn.Module):
         "cls_token",
         "pos_embed",
         "mask_token",
+        "register_tokens",
     }
     dinov2_params_flat = []
     for path, param in jax_params_flat:
@@ -43,7 +44,7 @@ def load_vit_params(params_jax: dict, vit_pt: torch.nn.Module):
     return jax.tree_util.tree_unflatten(jax_param_pytree, dinov2_params_flat)
 
 
-def load_dino_vits():
+def load_dino_vits(img_size=518):
     num_heads = 6
     embed_dim = 384
     mlp_ratio = 4
@@ -54,14 +55,15 @@ def load_dino_vits():
         embed_dim=embed_dim,
         mlp_ratio=mlp_ratio,
         depth=12,
-        img_size=518,
+        img_size=img_size,
+        register_token=True,
     )
     vit_def = vit_cls()
-    vit_params = vit_def.init(jax.random.PRNGKey(0), jnp.ones((1, 518, 518, 3)))[
+    vit_params = vit_def.init(jax.random.PRNGKey(0), jnp.ones((1, img_size, img_size, 3)))[
         "params"
     ]
 
-    dinov2_vits14 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
+    dinov2_vits14 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14_reg")
 
     params = load_vit_params(vit_params, dinov2_vits14)
 
@@ -71,17 +73,17 @@ def load_dino_vits():
 def test_dino_vits():
     import numpy as onp
 
-    image = jax.random.uniform(jax.random.PRNGKey(0), (1, 518, 518, 3))
-    jax_vit_def, jax_params = load_dino_vits()
+    image = jax.random.uniform(jax.random.PRNGKey(0), (1, 70, 70, 3))
+    jax_vit_def, jax_params = load_dino_vits(70)
 
     # JAX: forward pass
-    image = jax.random.uniform(jax.random.PRNGKey(0), (1, 518, 518, 3))
+    image = jax.random.uniform(jax.random.PRNGKey(0), (1, 70, 70, 3))
     embed_jax = jax_vit_def.apply({"params": jax_params}, image, training=False)
     embed_jax = onp.asarray(embed_jax["x_norm_patchtokens"])
 
     # Torch: forward pass
     image_torch = torch.from_numpy(onp.asarray(image.transpose((0, 3, 1, 2)))).cuda()
-    dinov2_vits14 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14").cuda()
+    dinov2_vits14 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14_reg").cuda()
     dinov2_vits14 = dinov2_vits14.cuda()
     dinov2_vits14.eval()
     embed_torch = (
@@ -91,7 +93,7 @@ def test_dino_vits():
         .numpy()
     )
     embed_torch2 = (
-        dinov2_vits14.forward_features(torch.rand((1, 3, 518, 518), device="cuda"))[
+        dinov2_vits14.forward_features(torch.rand((1, 3, 70, 70), device="cuda"))[
             "x_norm_patchtokens"
         ]
         .detach()

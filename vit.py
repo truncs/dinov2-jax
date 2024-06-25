@@ -18,7 +18,12 @@ class DinoViT(nn.Module):
 
     patch_size: int = 14
     embed_dim: int = 384
+    num_pos_tokens: int = 1369
+    num_cls_tokens: int = 1
+    num_register_tokens: int = 4
 
+    register_tokens: bool = False
+    
     depth: int = 12
 
     num_heads: int = 6
@@ -44,7 +49,7 @@ class DinoViT(nn.Module):
         dim = x.shape[-1]
         w0 = w // self.patch_size
         h0 = h // self.patch_size
-        w0, h0 = w0 + 0.1, h0 + 0.1
+        #w0, h0 = w0 + 0.1, h0 + 0.1
 
         patch_pos_embed = jax.image.resize(
             patch_pos_embed.reshape(1, int(N**0.5), int(N**0.5), dim),
@@ -77,16 +82,31 @@ class DinoViT(nn.Module):
         x = jnp.concatenate((cls_token, x), axis=1)
 
         num_patches = (self.img_size // self.patch_size) ** 2
-        num_tokens = 1
 
         pos_embed = self.param(
             "pos_embed",
             nn.initializers.zeros,
-            (1, num_patches + num_tokens, self.embed_dim),
+            (1, self.num_pos_tokens + self.num_cls_tokens, self.embed_dim),
         )
         x = x + self._interpolate_pos_encoding(
             x, self.img_size, self.img_size, pos_embed
         )
+
+        if self.register_tokens:
+            register_token = self.param(
+                "register_tokens",
+                nn.initializers.zeros,
+                (1, self.num_register_token, self.embed_dim),
+            )
+            register_token = jnp.broadcast_to(register_token, (x.shape[0], *register_token.shape[1:]))
+            x = jnp.concatenate(
+                (
+                    x[:, :1],
+                    register_token,
+                    x[:, 1:],
+                ),
+                axis=1,
+            )
 
         for i in range(self.depth):
             x = self.BlockClass(
@@ -100,8 +120,17 @@ class DinoViT(nn.Module):
             )(x, training=training)
 
         x_norm = nn.LayerNorm(name="norm")(x)
-        return {
-            "x_norm_clstoken": x_norm[:, 0],
-            "x_norm_patchtokens": x_norm[:, 1:],
-            "x_prenorm": x,
-        }
+
+        if self.register_tokens:
+            return {
+                "x_norm_clstoken": x_norm[:, 0],
+                "x_norm_regtokens": x_norm[:, 1 : self.num_register_tokens + 1],
+                "x_norm_patchtokens": x_norm[:, self.num_register_token + 1 :],
+                "x_prenorm": x,
+            }
+        else:
+            return {
+                "x_norm_clstoken": x_norm[:, 0],
+                "x_norm_patchtokens": x_norm[:, 1:],
+                "x_prenorm": x,
+            }
