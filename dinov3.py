@@ -245,7 +245,7 @@ class Block(nn.Module):
         if training:
             x = x + DropPath(
                 rate=self.drop_path_rate, name="drop_path1", deterministic=not training
-            )(attn_residual_func(x))
+            )(attn_residual_func(x, rope))
             x = x + DropPath(
                 rate=self.drop_path_rate, name="drop_path2", deterministic=not training
             )(ffn_residual_func(x))
@@ -343,8 +343,6 @@ class DinoViT(nn.Module):
         )
         cls_token = jnp.broadcast_to(cls_token, (x.shape[0], *cls_token.shape[1:]))
         x = jnp.concatenate((cls_token, x), axis=1)
-
-        num_patches = (self.img_size // self.patch_size) ** 2
 
         if self.storage_tokens:
             storage_token = self.param(
