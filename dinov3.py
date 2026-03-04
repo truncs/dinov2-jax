@@ -409,7 +409,7 @@ if __name__ == '__main__':
 
     image = jax.random.uniform(jax.random.PRNGKey(0), (1, 64, 64, 3))
     jax_vit_def = DinoViT()
-    jax_params = vit_def.init(
+    jax_params = jax_vit_def.init(
         jax.random.PRNGKey(0), jnp.ones((1, 64, 64, 3)))
 
     jax_params = load_from_torch(jax_params)
